@@ -46,11 +46,11 @@ pico_enable_stdio_usb(firmware 1)
 
 # Add the standard library to the build
 target_link_libraries(firmware
+        pico_stdlib
         hardware_i2c
         pico_cyw43_arch_lwip_threadsafe_background
         pico_lwip_mqtt
         pico_stdio
-        pico_stdlib
         pico_multicore
         )
 

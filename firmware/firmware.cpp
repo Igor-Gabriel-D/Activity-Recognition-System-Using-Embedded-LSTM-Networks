@@ -12,9 +12,6 @@
 #include "include/x_test_pico.h"
 #include "include/model.h"
 
-//#define WIFI_SSID "Gabriel"
-//#define WIFI_PASS "88458737"
-
 #define WIFI_SSID "tarefa-mqtt"
 #define WIFI_PASS "laica@2025"
 
@@ -246,6 +243,25 @@ void run_prediction(float input_seq[TIME_STEPS][INPUT_SIZE], int sample_idx) {
     for (int i = 0; i < OUTPUT_SIZE; i++)
         printf("Classe %d: %.3f\n", i, probs[i]);
     printf("Classe predita: %d\n", pred_class);
+
+
+    // ---- Publica resultado no MQTT ----
+    if (client != NULL && mqtt_client_is_connected(client)) {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "{\"pred\": %d, \"0\": %.3f, \"1\": %.3f, \"2\": %.3f, \"3\": %.3f}",
+                 pred_class, probs[0], probs[1], probs[2], probs[3]);
+
+        err_t err = mqtt_publish(client, MQTT_RESULT_TOPIC,
+                                 msg, strlen(msg),
+                                 0, 0, mqtt_pub_request_cb, NULL);
+        if (err == ERR_OK)
+            printf("Resultado publicado no MQTT: %s\n", msg);
+        else
+            printf("Falha ao publicar (erro %d)\n", err);
+    } else {
+        printf("MQTT não conectado, não foi possível publicar.\n");
+    }
 }
 
 
@@ -339,28 +355,9 @@ int main()
     
     float* scaled = new float[total_len];
     
-    for (size_t i = 0; i < num_samples; i++) {
-        float* input_ptr  = &X_test_pico[i * scaler_len];
-        float* output_ptr = &scaled[i * scaler_len];
-        standard_scale(input_ptr, output_ptr, scaler_len);
-    }
-    sleep_ms(4000);
-
     size_t sample_idx = 3;  // 0 = primeira, 1 = segunda, 2 = terceira, etc.
 
-    for (size_t j = 0; j < scaler_len; j++) {
-        printf("%.3f ",scaled[sample_idx * scaler_len + j]);
-    }
-    printf("\n");
 
-        // --- Prepara entrada para o modelo [TIME_STEPS][INPUT_SIZE] ---
-    float input_seq[TIME_STEPS][INPUT_SIZE];
-    for (int t = 0; t < TIME_STEPS; t++) {
-        input_seq[t][0] = scaled[sample_idx * scaler_len + t];  // INPUT_SIZE = 1
-    }
-
-    // --- Executa o modelo ---
-    run_prediction(input_seq, sample_idx);
 
     sleep_ms(10000);
 
@@ -416,7 +413,7 @@ int main()
             shared_input_seq[t][0] = scaled_seq[t];
         }
 
-        // Sinaliza que há nova sequência pra predição
+
         ready_for_prediction = true;
 
 
